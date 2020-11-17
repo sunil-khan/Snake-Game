@@ -1,0 +1,616 @@
+
+<!-- Source link: https://gist.github.com/straker/ff00b4b49669ad3dec890306d348adc4 -->
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Snake</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+    }          
+    body{
+      background-color: #000000;
+    }
+    .wrap{
+      margin-left: auto;
+      margin-right: auto;
+    }
+    header{
+      width: 340px;
+      font-size: 0;
+    }
+    canvas{
+      display: none;
+      border-style: solid;
+      border-width: 10px;
+      border-color: #FFFFFF;
+    }
+    canvas:focus{
+      outline: none;
+    }
+
+    /* Top Styles */
+    h1{
+
+      display: inline-block;
+      width: 100px;
+      font-size: 32px;
+      color: #FFFFFF;
+    }
+    .score{
+      display: inline-block;
+      width: 240px;
+      font-size: 20px;
+      color: #FFFFFF;
+      text-align: right;
+    }
+    .score_value{
+      font-size: inherit;
+    }
+
+
+
+    /* All screens style */
+    #gameover a,  #menu a{
+      display: block;
+    }
+
+    #gameover a,hover, #menu a:hover{
+      cursor: pointer;
+    }
+
+    #gameover a:hover::before,#menu a:hover::before{
+      content: ">";
+      margin-right: 10px;
+    }
+
+    /* Menu Screen Style */
+    #menu{
+      display: block;
+      width: 340px;
+      padding-top: 95px;
+      padding-bottom: 95px;
+      font-size: 40px;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: center;
+      color: #FFF;
+    }
+
+
+    /* Game Over Screen Style */
+
+    #gameover{
+      display: none;
+      width: 340px;
+      padding-top: 95px;
+      padding-bottom: 95px;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: center;
+      font-size: 30px;
+      color: #FFF;
+    }
+
+    #gameover p{
+      margin-top: 25px;
+      font-size: 20px;
+    }
+
+
+  </style>
+</head>
+<body>
+
+  <header class="wrap">
+    <h1>Snaki</h1>
+    <p class="score">Score: <span id="score_value">0</span></p>
+  </header>
+  <canvas class="wrap snake_firework" id="snake" width="400" height="400" id="game"></canvas>
+
+  <!-- Game Over Screen -->
+  <div id="gameover">
+    <h2>Game Over</h2>
+    <p >Your score is: <span id="score_display">0</span></p>
+    <a id="newgame_gameover">New game</a>
+  </div>
+
+  <!-- Main Menu Screen -->
+  <div id="menu">
+    <h2>Snake</h2>
+    <a id="newgame_menu">Wallie</a>               
+    <a id="newgame_menu1">No Walls</a>
+
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/2.2.0/anime.js"></script>
+  <script>
+
+    // firework variables
+    // window.human = false;
+    var numberOfParticules = 30;
+    var pointerX = 0;
+    var pointerY = 0;
+    var tap = ('ontouchstart' in window || navigator.msMaxTouchPoints) ? 'touchstart' : 'mousedown';
+    var colors = ['#5A87FF'];
+
+    // we can user multi colors as well
+    // var colors = ['#FF1461', '#18FF92', '#5A87FF', '#FBF38C'];
+
+    var canvas = document.getElementById('snake');
+    var canvasEl = document.querySelector('.snake_firework');
+
+    var context = canvas.getContext('2d');
+    // Score
+    var score;
+    var game_over_flag = false;   
+
+    // Wall Variable to handle game modes.
+    var wall;
+    
+    // HTML Elements
+    var screen_snake;
+    var screen_menu;
+    var screen_gameover;
+    var button_newgame_menu;
+    var button_newgame_no_wall_menu; 
+    var button_newgame_gameover;
+    var ele_score;
+    var gameOver_score;
+
+
+    var CANVAS_WIDTH = 400;
+    var CANVAS_HEIGHT = 400;
+    var FIREWORK_LENGTH = 200;
+    var PARTICLES = [];
+    var SEGMENTS = [];
+    var DEFAULT_VELOCITY = [0, 0];
+    var intervalDes;
+    
+    var grid = 16;
+    var count = 0;
+
+    let fireworks = [],
+    particles = [];
+
+    var snake = 
+    {
+      x: 160,
+      y: 160,
+
+  // snake velocity. moves one grid length every frame in either the x or y direction
+  dx: grid,
+  dy: 0,
+  
+  // keep track of all grids the snake body occupies
+  cells: [],
+  
+  // length of the snake. grows when eating an apple
+  maxCells: 4
+};
+var apple = {
+  x: 320,
+  y: 320
+};
+
+
+
+
+// Firework code
+// Code source: https://codepen.io/dogboy602k/pen/qyVrMx
+
+
+function setParticuleDirection(p) {
+  var angle = anime.random(0, 360) * Math.PI / 180;
+  var value = anime.random(50, 180);
+  var radius = [-1, 1][anime.random(0, 1)] * value;
+  return {
+    x: p.x + radius * Math.cos(angle),
+    y: p.y + radius * Math.sin(angle)
+  }
+}
+
+function createParticule(x,y) {
+  var p = {};
+  p.x = x;
+  p.y = y;
+  p.color = colors[anime.random(0, colors.length - 1)];
+  p.radius = anime.random(5, 10);
+  p.endPos = setParticuleDirection(p);
+  p.draw = function() {
+    context.beginPath();
+    context.arc(p.x, p.y, p.radius, 0, 2 * Math.PI, true);
+    context.fillStyle = p.color;
+    context.fill();
+  }
+  return p;
+}
+
+function createCircle(x,y) {
+  var p = {};
+  p.x = x;
+  p.y = y;
+  p.color = '#FFF';
+  p.radius = 0.1;
+  p.alpha = .5;
+  p.lineWidth = 6;
+  p.draw = function() {
+    context.globalAlpha = p.alpha;
+    context.beginPath();
+    context.arc(p.x, p.y, p.radius, 0, 2 * Math.PI, true);
+    context.lineWidth = p.lineWidth;
+    context.strokeStyle = p.color;
+    context.stroke();
+    context.globalAlpha = 1;
+  }
+  return p;
+}
+
+
+function renderParticule(anim) {
+  for (var i = 0; i < anim.animatables.length; i++) {
+    anim.animatables[i].target.draw();
+  }
+}
+
+function animateParticules(x, y) {
+  var circle = createCircle(x, y);
+  var particules = [];
+  for (var i = 0; i < numberOfParticules; i++) {
+    particules.push(createParticule(x, y));
+  }
+  anime.timeline().add({
+    targets: particules,
+    x: function(p) { return p.endPos.x; },
+    y: function(p) { return p.endPos.y; },
+    radius: 0.1,
+    duration: anime.random(1200, 1800),
+    easing: 'easeOutExpo',
+    update: renderParticule
+  })
+    .add({
+    targets: circle,
+    radius: anime.random(80, 160),
+    lineWidth: 0,
+    alpha: {
+      value: 0,
+      easing: 'linear',
+      duration: anime.random(600, 800),  
+    },
+    duration: anime.random(1200, 1800),
+    easing: 'easeOutExpo',
+    update: renderParticule,
+    offset: 0
+  });
+}
+
+var render = anime({
+  //duration: Infinity,
+  update: function() {
+    context.clearRect(0, 0, canvasEl.width, canvasEl.height);
+  }
+});
+
+// get random whole numbers in a specific range
+// @see https://stackoverflow.com/a/1527820/2124254
+
+
+
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min)) + min;
+}
+
+function soundOutPlay()
+{
+  new Audio('outsound.mp3').play();
+
+}
+function soundPlaySwallow()
+{
+
+  new Audio('swallowsound.mp3').play();
+
+}
+
+function start_game() 
+{
+
+  if (!game_over_flag) {
+    requestAnimationFrame(start_game);
+  }
+  
+  
+  if (++count < 4) 
+  {
+    return;
+  }
+
+  count = 0;
+  context.clearRect(0,0,canvas.width,canvas.height);
+
+  // move snake by it's velocity
+  snake.x += snake.dx;
+  snake.y += snake.dy;
+
+
+
+  if (!game_over_flag) 
+  {
+    if(game_over_flag == false)
+    {
+
+
+
+      if (snake.x < 0) 
+      {
+
+
+       if(wall==0)
+       {
+        soundOutPlay();
+        boundry ();
+        return;
+      }
+      else 
+      {
+
+
+       snake.x = canvas.width - grid;
+     }
+   }
+   else if (snake.x >= canvas.width) 
+   {
+
+     if(wall==0)
+     {
+
+      soundOutPlay();
+      boundry ();
+      return;
+    }
+    else 
+    {
+
+
+
+        // soundOutPlay();
+        snake.x = 0;
+      }  
+    }
+
+  // wrap snake position vertically on edge of screen
+  if (snake.y < 0) 
+  {
+
+
+   if(wall==0)
+   {
+
+    soundOutPlay();
+
+    boundry ();
+    return;
+  }
+  else 
+  {
+
+   snake.y = canvas.height - grid;
+ }  
+}
+else if (snake.y >= canvas.height) 
+{
+ if(wall==0){
+  soundOutPlay();
+  boundry ();
+  return;
+}
+else 
+{
+
+  snake.y = 0; 
+}  
+}
+}
+}
+
+
+  // keep track of where snake has been. front of the array is always the head
+  snake.cells.unshift({x: snake.x, y: snake.y});
+
+  // remove cells as we move away from them
+  if (snake.cells.length > snake.maxCells) {
+    snake.cells.pop();
+  }
+
+  // draw apple
+  context.fillStyle = 'red';
+  context.fillRect(apple.x, apple.y, grid-1, grid-1);
+
+  // draw snake one cell at a time
+  context.fillStyle = 'green';
+  snake.cells.forEach(function(cell, index) {
+
+    // drawing 1 px smaller than the grid creates a grid effect in the snake body so you can see how long it is
+    context.fillRect(cell.x, cell.y, grid-1, grid-1);  
+
+    // snake ate apple
+    if (cell.x === apple.x && cell.y === apple.y) {
+
+        render.play();
+   
+        animateParticules(apple.x, apple.y);
+        snake.maxCells++;
+        score += 1;
+        altScore(score);
+        // canvas is 400x400 which is 25x25 grids 
+        apple.x = getRandomInt(0, 25) * grid;
+        apple.y = getRandomInt(0, 25) * grid;
+        soundPlaySwallow();
+      
+    }
+
+    // check collision with all cells after this one (modified bubble sort)
+    for (var i = index + 1; i < snake.cells.length; i++) 
+    {
+
+      // snake occupies same space as a body part. reset game
+      if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
+        snake.x = 160;
+        snake.y = 160;
+        snake.cells = [];
+        snake.maxCells = 4;
+        snake.dx = grid;
+        snake.dy = 0;
+
+        apple.x = getRandomInt(0, 25) * grid;
+        apple.y = getRandomInt(0, 25) * grid;
+        soundOutPlay();
+
+        boundry();
+      }
+    }
+  });
+}
+
+
+// listen to keyboard events to move the snake
+document.addEventListener('keydown', function(e) {
+
+
+  // left arrow key
+  if (e.which === 37 && snake.dx === 0) {
+    snake.dx = -grid;
+    snake.dy = 0;
+  }
+  // up arrow key
+  else if (e.which === 38 && snake.dy === 0) {
+    snake.dy = -grid;
+    snake.dx = 0;
+  }
+  // right arrow key
+  else if (e.which === 39 && snake.dx === 0) {
+    snake.dx = grid;
+    snake.dy = 0;
+  }
+  // down arrow key
+  else if (e.which === 40 && snake.dy === 0) {
+    snake.dy = grid;
+    snake.dx = 0;
+  }
+});
+var showScreen = function(screen_opt){
+
+  switch(screen_opt){
+
+
+    case 0:  screen_snake.style.display = "block";
+    screen_menu.style.display = "none";
+    screen_gameover.style.display = "none";
+    break;
+
+    case 1:  screen_snake.style.display = "none";
+    screen_menu.style.display = "block";
+    screen_gameover.style.display = "none";
+    break;
+
+    case 2:  screen_snake.style.display = "none";
+    screen_menu.style.display = "none";
+    screen_gameover.style.display = "none";
+    break;
+
+    case 3: screen_snake.style.display = "none";
+    screen_menu.style.display = "none";
+    screen_gameover.style.display = "block";
+    break;
+  }
+}
+
+var altScore = function(score_val){
+  ele_score.innerHTML = String(score_val);
+}
+var boundry = function()
+{
+	snake.x = 160;
+  snake.y = 160;
+  snake.cells = [];
+  snake.maxCells = 4;
+  snake.dx = 16;
+  snake.dy = 0;
+
+  game_over_flag =true;
+  showScreen(3);
+  gameOver_score.innerHTML = String(score);                    
+  return;
+}
+
+var newGame = function()
+{
+
+  showScreen(0);
+
+  screen_snake.focus();
+
+  score = 0;
+  altScore(score);
+  
+  game_over_flag = false;
+  
+  start_game();
+
+}
+var startOver = function()
+{
+
+  showScreen(1);
+
+  screen_menu.focus();
+  score = 0;  
+  altScore(score);
+
+  start_game();
+
+}
+
+
+//requestAnimationFrame(start_game);
+
+var setWall = function(wall_value){
+
+  wall = wall_value;
+  if(wall == 1){screen_snake.style.borderColor = "#606060";}
+  if(wall == 0){screen_snake.style.borderColor = "#FFFFFF";}     
+}
+
+// start the game
+window.onload = function(){
+
+  ctx = canvas.getContext("2d");
+
+            // Screens
+            screen_snake = document.getElementById("snake");
+            screen_menu = document.getElementById("menu");
+            screen_gameover = document.getElementById("gameover");
+
+            // Buttons
+
+            button_newgame_menu = document.getElementById("newgame_menu");
+            button_newgame_menu_nowall = document.getElementById("newgame_menu1");
+            button_newgame_gameover = document.getElementById("newgame_gameover");
+
+            // etc
+            ele_score = document.getElementById("score_value");
+            gameOver_score= document.getElementById("score_display");
+
+  	//listeners
+    button_newgame_menu.onclick = function(){wall=0; newGame(); setWall(wall);};
+    button_newgame_menu_nowall.onclick = function(){wall=1; newGame(); setWall(wall);};
+    button_newgame_gameover.onclick = function(){ startOver();};
+        //setWall(wall);
+
+        showScreen("menu");
+      }();
+
+    </script>
+  </body>
+  </html>
